@@ -1,0 +1,192 @@
+.result-screen {
+  background: var(--color-bg);
+  padding: 2rem;
+  position: relative;
+  min-height: 100vh;
+}
+
+.result-scroll {
+  position: relative;
+  max-width: 600px;
+  width: 100%;
+  background: var(--color-parchment);
+  border: 3px solid var(--color-ink);
+  border-radius: 4px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.result-close {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--color-ink);
+  background: transparent;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: all 0.2s;
+}
+
+.result-close:hover {
+  background: var(--color-ink);
+  color: var(--color-bg);
+}
+
+/* Header label bar */
+.result-header {
+  padding: 1.5rem 2rem 0;
+}
+
+.result-label-bar {
+  background: var(--color-accent);
+  padding: 1rem 2rem;
+  text-align: center;
+}
+
+.result-label {
+  font-family: var(--font-mono);
+  font-size: 2rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-dark);
+  letter-spacing: 0.05em;
+}
+
+.result-tagline {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-dark);
+  margin-top: 0.25rem;
+}
+
+/* Content area */
+.result-content {
+  padding: 1.5rem 2rem 2rem;
+}
+
+.result-visual {
+  margin-bottom: 1.5rem;
+}
+
+.result-description {
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  text-align: center;
+  color: var(--color-ink);
+}
+
+/* Preserved */
+.result--preserved .preserved-frame {
+  border: 2px solid #ccc;
+  padding: 1rem;
+  display: flex;
+  justify-content: center;
+  background: white;
+}
+
+.preserved-frame img {
+  width: 250px;
+  height: auto;
+}
+
+/* Cremated */
+.result--cremated .cremated-void {
+  width: 100%;
+  height: 300px;
+  background: var(--color-dark);
+  border-radius: 2px;
+}
+
+.result--cremated .result-description {
+  color: var(--color-gray);
+}
+
+/* Burial */
+.burial-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.burial-palanquin {
+  width: 200px;
+  height: auto;
+  opacity: 0.4;
+}
+
+.burial-cross {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 6rem;
+  color: var(--color-red);
+  font-weight: 700;
+  text-shadow: 0 2px 20px rgba(204, 0, 0, 0.3);
+}
+
+/* Organ donation */
+.organ-text {
+  font-family: var(--font-serif);
+  font-size: 0.85rem;
+  line-height: 1.8;
+  text-align: center;
+}
+
+.organ-text p {
+  margin-bottom: 0.8rem;
+}
+
+.redacted-block {
+  display: inline-block;
+  width: 100px;
+  height: 1em;
+  background: var(--color-dark);
+  vertical-align: middle;
+  margin: 0 0.3rem;
+  transform-origin: left;
+}
+
+/* Scanner on result page */
+.result-scanner {
+  position: absolute;
+  bottom: 2rem;
+  right: 2rem;
+  opacity: 0.5;
+}
+
+.result-scanner img {
+  width: 100px;
+  height: auto;
+}
+
+/* Back button */
+.result-back {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-gray);
+  background: transparent;
+  border: 1px solid var(--color-gray);
+  padding: 0.5rem 1.5rem;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+  transition: all 0.3s;
+}
+
+.result-back:hover {
+  color: var(--color-ink);
+  border-color: var(--color-ink);
+}

@@ -1,0 +1,47 @@
+.zoomin-screen {
+  background: var(--color-bg);
+}
+
+.zoomin-layout {
+  display: flex;
+  align-items: flex-end;
+  gap: 2rem;
+  position: relative;
+}
+
+.zoomin-palanquin img {
+  width: min(400px, 45vw);
+  height: auto;
+}
+
+.zoomin-notice {
+  cursor: pointer;
+  transition: transform 0.3s ease;
+  position: relative;
+}
+
+.zoomin-notice:hover {
+  transform: scale(1.1) rotate(-3deg);
+}
+
+.zoomin-notice img {
+  width: 120px;
+  height: auto;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
+}
+
+.zoomin-arrow {
+  font-size: 1.5rem;
+  color: var(--color-gray);
+  align-self: center;
+}
+
+.zoomin-hint {
+  position: absolute;
+  bottom: 2rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--color-gray);
+  letter-spacing: 0.15em;
+  animation: pulse 2s ease-in-out infinite;
+}

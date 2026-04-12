@@ -1,0 +1,567 @@
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { gsap } from 'gsap'
+import { TOMBS } from '../data/tombs'
+import { GRAVE_BG, OBJECTUARY_ICON, SCANNER_ON, SCANNER } from '../assets'
+import { useAttention } from '../hooks/useAttention'
+import { useAudio } from '../hooks/useAudio'
+import {
+  AMBIENT_SOUNDTRACK, ZOOM_IN, ZOOM_OUT, GRAVE_HOVER, CLICK,
+  SCANNER_HOVERING, PAPER_HOVERING, SCANNER_LOOP, SCANNING_DONE,
+  RESULT_SOUNDS,
+} from '../audio'
+import './ObjectuaryScreen.css'
+
+const ZOOM_SCALE = 2.5
+
+const RESULT_DATA = {
+  preserved: {
+    label: 'Preserved',
+    tagline: 'Image is taken for aesthetic purposes',
+    description: 'The object is kept intact \u2014 displayed, admired, catalogued. Its context is stripped but its form survives. A beautiful cage. The story behind it is replaced by the story the institution chooses to tell.',
+  },
+  cremated: {
+    label: 'Cremated',
+    tagline: 'presence is vanished',
+    description: 'Complete erasure. The object, its story, and the people it represented are consumed. Nothing remains \u2014 not even the gap. The absence itself has been made absent.',
+  },
+  burial: {
+    label: 'Buried',
+    tagline: 'Essence of it is left in a form of a symbol',
+    description: 'The object is reduced to a symbol \u2014 a stamp, a shorthand, a footnote. It exists only as reference. The weight is gone. What survives is the shape of meaning without the substance of presence.',
+  },
+  'organ-donation': {
+    label: 'Organ Donated',
+    tagline: 'Only the useful parts are taken',
+    description: 'The object is selectively harvested. Useful fragments \u2014 a date, a material, a decorative pattern \u2014 are extracted for academic papers, museum labels, gift shop reproductions. The rest is discarded.',
+  },
+}
+
+function getTombWidth(tomb, views) {
+  const base = tomb.isPalanquin ? 88 : 80
+  const clicks = views[tomb.id] || 0
+  // Each click adds 8% width, up to 160% max growth
+  return base * (1 + Math.min(clicks * 0.08, 1.6))
+}
+
+export default function ObjectuaryScreen({ onSelect, disableInteraction = false, revealing = false }) {
+  const mapRef = useRef(null)
+  const [zoomed, setZoomed] = useState(false)
+  const [selectedTomb, setSelectedTomb] = useState(null)
+  const [showPaper, setShowPaper] = useState(false)
+  const { views: tombViews, increment: incrementAttention } = useAttention()
+  const [attentionPopups, setAttentionPopups] = useState([])
+  const { play, loop, stop } = useAudio()
+  const readyRef = useRef(false)
+  const hasRevealedRef = useRef(false)
+  const disabledRef = useRef(disableInteraction)
+  const paperRef = useRef(null)
+  const hoverRef = useRef(null)
+  const zoomingRef = useRef(false)
+
+  // Map drag state
+  const isDraggingMap = useRef(false)
+  const hasDraggedMap = useRef(false)
+  const lastMapDragCoords = useRef({ x: 0, y: 0 })
+  const mapTranslate = useRef({ x: 0, y: 0 })
+
+  // Scanner state
+  const [scanResult, setScanResult] = useState(null)
+  const [scanProgress, setScanProgress] = useState(0)
+  const [scanComplete, setScanComplete] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const scannerContainerRef = useRef(null)
+  const dragStartYRef = useRef(0)
+  const scannerStartYRef = useRef(0)
+
+  useEffect(() => {
+    disabledRef.current = disableInteraction
+  }, [disableInteraction])
+
+  useEffect(() => {
+    if (!disableInteraction) {
+      if (mapRef.current) {
+        gsap.set(mapRef.current.querySelectorAll('.tomb'), { opacity: 0.85 })
+      }
+      hasRevealedRef.current = true
+      setTimeout(() => { readyRef.current = true }, 300)
+      loop(AMBIENT_SOUNDTRACK, { volume: 0.3 })
+    }
+  }, [disableInteraction, loop])
+
+  useEffect(() => {
+    if (revealing && !hasRevealedRef.current && mapRef.current) {
+      hasRevealedRef.current = true
+      gsap.to(mapRef.current.querySelectorAll('.tomb'), {
+        opacity: 0.85, duration: 0.6, ease: 'power1.out',
+      })
+    }
+  }, [revealing])
+
+  // Animate hovering view in
+  useEffect(() => {
+    if (selectedTomb && hoverRef.current) {
+      gsap.fromTo(hoverRef.current,
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: 'power2.out' }
+      )
+    }
+  }, [selectedTomb])
+
+  // Animate paper in + use tomb's predetermined result
+  useEffect(() => {
+    if (showPaper && paperRef.current) {
+      gsap.fromTo(paperRef.current,
+        { scale: 0.8, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.4)' }
+      )
+      setScanResult(selectedTomb.scanResult)
+      setScanProgress(0)
+      setScanComplete(false)
+    }
+  }, [showPaper, selectedTomb])
+
+  // Scroll wheel down to zoom out
+  useEffect(() => {
+    const handleWheel = (e) => {
+      if (!zoomed || selectedTomb || showPaper || zoomingRef.current) return
+      if (e.deltaY > 0) {
+        e.preventDefault()
+        zoomingRef.current = true
+        play(ZOOM_OUT, { volume: 0.5 })
+        gsap.to(mapRef.current, {
+          scale: 1,
+          x: 0,
+          y: 0,
+          duration: 0.6,
+          ease: 'power2.inOut',
+          onComplete: () => {
+            mapRef.current.classList.remove('cemetery-map--zoomed')
+            setZoomed(false)
+            zoomingRef.current = false
+          },
+        })
+      }
+    }
+    window.addEventListener('wheel', handleWheel, { passive: false })
+    return () => window.removeEventListener('wheel', handleWheel)
+  }, [zoomed, selectedTomb, showPaper])
+
+  // Pinch-to-zoom-out gesture
+  useEffect(() => {
+    let initialDistance = null
+
+    const getDistance = (t1, t2) => {
+      const dx = t1.clientX - t2.clientX
+      const dy = t1.clientY - t2.clientY
+      return Math.sqrt(dx * dx + dy * dy)
+    }
+
+    const handleTouchStart = (e) => {
+      if (!zoomed || selectedTomb || showPaper || zoomingRef.current) return
+      if (e.touches.length === 2) {
+        initialDistance = getDistance(e.touches[0], e.touches[1])
+      }
+    }
+
+    const handleTouchMove = (e) => {
+      if (!zoomed || selectedTomb || showPaper || zoomingRef.current) return
+      if (e.touches.length === 2 && initialDistance !== null) {
+        e.preventDefault()
+        const currentDistance = getDistance(e.touches[0], e.touches[1])
+        if (initialDistance - currentDistance > 50) {
+          initialDistance = null
+          zoomingRef.current = true
+          gsap.to(mapRef.current, {
+            scale: 1,
+            x: 0,
+            y: 0,
+            duration: 0.6,
+            ease: 'power2.inOut',
+            onComplete: () => {
+              mapRef.current.classList.remove('cemetery-map--zoomed')
+              setZoomed(false)
+              zoomingRef.current = false
+            },
+          })
+        }
+      }
+    }
+
+    const handleTouchEnd = () => {
+      initialDistance = null
+    }
+
+    window.addEventListener('touchstart', handleTouchStart, { passive: false })
+    window.addEventListener('touchmove', handleTouchMove, { passive: false })
+    window.addEventListener('touchend', handleTouchEnd)
+    return () => {
+      window.removeEventListener('touchstart', handleTouchStart)
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [zoomed, selectedTomb, showPaper])
+
+  const handleZoomIn = useCallback((e) => {
+    if (zoomed || !readyRef.current || disabledRef.current || zoomingRef.current) return
+    const clickX = (e.clientX / window.innerWidth) * 100
+    const clickY = (e.clientY / window.innerHeight) * 100
+    mapRef.current.classList.add('cemetery-map--zoomed')
+    zoomingRef.current = true
+    play(ZOOM_IN, { volume: 0.5 })
+    mapTranslate.current = { x: 0, y: 0 }
+    gsap.to(mapRef.current, {
+      scale: ZOOM_SCALE,
+      x: 0,
+      y: 0,
+      transformOrigin: `${clickX}% ${clickY}%`,
+      duration: 0.8,
+      ease: 'power2.out',
+      onComplete: () => {
+        setZoomed(true)
+        zoomingRef.current = false
+      },
+    })
+  }, [zoomed])
+
+  const handleMapPointerDown = useCallback((e) => {
+    if (!zoomed || selectedTomb || showPaper || zoomingRef.current) return
+    isDraggingMap.current = true
+    hasDraggedMap.current = false
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    lastMapDragCoords.current = { x: clientX, y: clientY }
+  }, [zoomed, selectedTomb, showPaper])
+
+  useEffect(() => {
+    if (!zoomed) return
+    const handleMove = (e) => {
+      if (!isDraggingMap.current || selectedTomb || showPaper) return
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY
+      const deltaX = clientX - lastMapDragCoords.current.x
+      const deltaY = clientY - lastMapDragCoords.current.y
+      
+      if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+        hasDraggedMap.current = true
+      }
+
+      lastMapDragCoords.current = { x: clientX, y: clientY }
+      mapTranslate.current.x += deltaX
+      mapTranslate.current.y += deltaY
+
+      gsap.set(mapRef.current, { x: mapTranslate.current.x, y: mapTranslate.current.y })
+    }
+    const handleUp = () => {
+      isDraggingMap.current = false
+    }
+
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+    window.addEventListener('touchmove', handleMove, { passive: false })
+    window.addEventListener('touchend', handleUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+      window.removeEventListener('touchmove', handleMove)
+      window.removeEventListener('touchend', handleUp)
+    }
+  }, [zoomed, selectedTomb, showPaper])
+
+  // Click tomb: increment attention via API, show +1 animation, then open hovering view
+  const handleTombClick = useCallback((e, tomb) => {
+    e.stopPropagation()
+    if (hasDraggedMap.current) return // Prevent click if user was dragging map
+    play(GRAVE_HOVER)
+
+    // "+1 Attention" popup animation
+    const tombEl = e.currentTarget
+    const popupId = Date.now()
+    const rect = tombEl.getBoundingClientRect()
+    setAttentionPopups((prev) => [
+      ...prev,
+      { id: popupId, x: rect.left + rect.width / 2, y: rect.top },
+    ])
+
+    // Pulse the tomb slightly bigger
+    gsap.fromTo(tombEl, { scale: 1 }, {
+      scale: 1.15,
+      duration: 0.25,
+      ease: 'back.out(2)',
+      yoyo: true,
+      repeat: 1,
+    })
+
+    // Remove popup after animation
+    setTimeout(() => {
+      setAttentionPopups((prev) => prev.filter((p) => p.id !== popupId))
+    }, 1400)
+
+    // Fire API call immediately — state will update and tomb width re-renders
+    incrementAttention(tomb.id)
+
+    // Delay before opening the hovering view so the +1 animation + growth are visible
+    setTimeout(() => {
+      setSelectedTomb(tomb)
+    }, 800)
+  }, [incrementAttention, play])
+
+  const handleBackFromHover = useCallback((e) => {
+    e.stopPropagation()
+    if (hoverRef.current) {
+      gsap.to(hoverRef.current, {
+        opacity: 0, duration: 0.3, ease: 'power2.in',
+        onComplete: () => setSelectedTomb(null),
+      })
+    }
+  }, [])
+
+  const handleOpenPaper = useCallback((e) => {
+    e.stopPropagation()
+    play(SCANNER_HOVERING)
+    setShowPaper(true)
+  }, [play])
+
+  const handleClosePaper = useCallback((e) => {
+    e.stopPropagation()
+    if (scanComplete) return
+    play(PAPER_HOVERING)
+    if (paperRef.current) {
+      gsap.to(paperRef.current, {
+        scale: 0.8, opacity: 0, duration: 0.3, ease: 'power2.in',
+        onComplete: () => setShowPaper(false),
+      })
+    }
+  }, [scanComplete])
+
+  // Return to cemetery from scan result
+  const handleReturnToCemetery = useCallback(() => {
+    play(CLICK)
+    // Stop the looping result sound
+    if (scanResult && RESULT_SOUNDS[scanResult]) {
+      stop(RESULT_SOUNDS[scanResult])
+    }
+    setShowPaper(false)
+    setSelectedTomb(null)
+    setScanComplete(false)
+    setScanProgress(0)
+    setScanResult(null)
+  }, [play, stop, scanResult])
+
+  // Scanner drag handlers (vertical, bidirectional)
+  const updateScanProgress = useCallback((clientY) => {
+    const container = scannerContainerRef.current
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    const scannerH = 80
+    const maxTravel = rect.height - scannerH
+    const deltaY = clientY - dragStartYRef.current
+    const newTop = Math.max(0, Math.min(maxTravel, scannerStartYRef.current + deltaY))
+    const progress = Math.round((newTop / maxTravel) * 100)
+    setScanProgress(progress)
+    return newTop
+  }, [])
+
+  const handleScanPointerDown = useCallback((e) => {
+    if (scanComplete) return
+    e.preventDefault()
+    e.stopPropagation()
+    loop(SCANNER_LOOP, { volume: 0.4 })
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    dragStartYRef.current = clientY
+    const scanner = e.currentTarget
+    scannerStartYRef.current = parseInt(scanner.style.top || '0', 10) || 0
+    setDragging(true)
+  }, [scanComplete])
+
+  useEffect(() => {
+    if (!dragging) return
+
+    const handleMove = (e) => {
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY
+      const newTop = updateScanProgress(clientY)
+      const scannerEl = scannerContainerRef.current?.querySelector('.scanner-device')
+      if (scannerEl) scannerEl.style.top = `${newTop}px`
+    }
+
+    const handleUp = () => {
+      setDragging(false)
+      stop(SCANNER_LOOP)
+      if (scanProgress >= 95) {
+        setScanProgress(100)
+        setScanComplete(true)
+        play(SCANNING_DONE)
+        if (scanResult && RESULT_SOUNDS[scanResult]) {
+          // Loop result sound until user returns to cemetery
+          setTimeout(() => loop(RESULT_SOUNDS[scanResult]), 400)
+        }
+      }
+    }
+
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+    window.addEventListener('touchmove', handleMove, { passive: false })
+    window.addEventListener('touchend', handleUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+      window.removeEventListener('touchmove', handleMove)
+      window.removeEventListener('touchend', handleUp)
+    }
+  }, [dragging, updateScanProgress, scanProgress])
+
+  const resultData = scanResult ? RESULT_DATA[scanResult] : null
+
+  return (
+    <div
+      className={`screen objectuary-screen ${zoomed ? 'objectuary-screen--zoomed' : ''}`}
+      style={{ pointerEvents: disableInteraction ? 'none' : 'auto' }}
+      onMouseDown={zoomed ? handleMapPointerDown : undefined}
+      onTouchStart={zoomed ? handleMapPointerDown : undefined}
+      onClick={!zoomed ? handleZoomIn : undefined}
+    >
+      <div className="cemetery-map" ref={mapRef}>
+        {TOMBS.map((tomb, i) => {
+          const w = getTombWidth(tomb, tombViews)
+          const shakeDelay = ((i * 2.7 + 1.3) % 5).toFixed(1)
+          const shakeDuration = (2 + (i % 3) * 0.8).toFixed(1)
+          return (
+            <div
+              key={tomb.id}
+              className={`tomb ${tomb.isPalanquin ? 'tomb--palanquin' : ''} tomb--shaking`}
+              style={{
+                left: `${tomb.x}%`,
+                top: `${tomb.y}%`,
+                width: `${w}px`,
+                transform: `translateX(-50%) rotate(${tomb.rotation}deg)`,
+                '--tomb-rot': `${tomb.rotation}deg`,
+                '--shake-delay': `${shakeDelay}s`,
+                '--shake-duration': `${shakeDuration}s`,
+              }}
+              onClick={zoomed && !selectedTomb ? (e) => handleTombClick(e, tomb) : undefined}
+            >
+              <img
+                src={tomb.image}
+                alt={tomb.content.title}
+              />
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Hovering view: large tomb + objectuary doc icon */}
+      {selectedTomb && !showPaper && (
+        <div className="hover-backdrop" ref={hoverRef} style={{ backgroundImage: `url('${GRAVE_BG}')` }}>
+          <div className="hover-tomb-container">
+            <img
+              className="hover-tomb-img"
+              src={selectedTomb.image}
+              alt={selectedTomb.content.title}
+            />
+            <div className="hover-objectuary-doc" onClick={handleOpenPaper}>
+              <img src={OBJECTUARY_ICON} alt="Objectuary" className="hover-doc-img" />
+              <span className="hover-doc-label">OBJECTUARY</span>
+            </div>
+          </div>
+
+          <button className="hover-back-btn" onClick={handleBackFromHover}>
+            &#8592;
+          </button>
+        </div>
+      )}
+
+      {/* Paper overlay with scanner */}
+      {showPaper && selectedTomb && (
+        <div className="paper-backdrop" onClick={handleClosePaper} style={{ backgroundImage: `url('${GRAVE_BG}')` }}>
+          <img
+            className="paper-backdrop-tomb"
+            src={selectedTomb.image}
+            alt=""
+          />
+          <div className="paper-container" ref={paperRef} onClick={(e) => e.stopPropagation()}>
+            {/* Custom hand-designed objectuary paper per tomb */}
+            <img src={selectedTomb.paperImage} alt="" className="paper-bg" style={{ opacity: 1 - scanProgress / 100 }} />
+
+            {/* Close button */}
+            {!scanComplete && (
+              <button className="paper-close" onClick={handleClosePaper}>{'\u00D7'}</button>
+            )}
+
+            {/* Scanner overlay — vertical */}
+            <div className="scanner-overlay" ref={scannerContainerRef}>
+              {/* Scan overlay sweeping trail */}
+              {!scanComplete && scanProgress > 0 && (
+                <div
+                  className="scan-overlay-trail"
+                  style={{
+                    top: 0,
+                    height: `${scanProgress}%`,
+                    opacity: dragging ? 1 : 0.4, /* Dim when paused */
+                  }}
+                />
+              )}
+
+              {/* Scanner device — starts at top, drag down */}
+              {!scanComplete && (
+                <div
+                  className="scanner-device"
+                  style={{ top: 0 }}
+                  onMouseDown={handleScanPointerDown}
+                  onTouchStart={handleScanPointerDown}
+                >
+                  <img src={SCANNER} alt="Scanner" />
+                </div>
+              )}
+
+              {/* Drag hint */}
+              {!scanComplete && scanProgress === 0 && (
+                <span className="scanner-drag-hint">drag scanner down to scan</span>
+              )}
+
+              {/* Result image — fades in with progress, replaces paper when complete */}
+              {scanResult && scanProgress > 0 && (
+                <div
+                  className={`scan-result-overlay${scanComplete ? ' scan-result--complete' : ''}`}
+                  style={{ opacity: scanProgress / 100 }}
+                >
+                  <img
+                    className="scan-result-img"
+                    src={selectedTomb.scannedImage}
+                    alt={resultData?.label || ''}
+                  />
+                  {scanComplete && (
+                    <button className="scan-return-btn" onClick={handleReturnToCemetery}>
+                      {'\u2190'} return to the objectuary
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {zoomed && !selectedTomb && (
+        <button className="zoom-out-btn" onClick={(e) => { e.stopPropagation(); zoomingRef.current = true; gsap.to(mapRef.current, { scale: 1, x: 0, y: 0, duration: 0.6, ease: 'power2.inOut', onComplete: () => { mapRef.current.classList.remove('cemetery-map--zoomed'); setZoomed(false); zoomingRef.current = false } }) }}>
+          zoom out
+        </button>
+      )}
+
+      {!selectedTomb && !showPaper && (
+        <p className="objectuary-hint">
+          {zoomed ? 'click a tomb to examine \u00B7 scroll down or pinch to zoom out' : 'click anywhere to zoom in'}
+        </p>
+      )}
+
+      {/* +1 Attention popups */}
+      {attentionPopups.map((popup) => (
+        <span
+          key={popup.id}
+          className="attention-popup"
+          style={{ left: popup.x, top: popup.y }}
+        >
+          +1 Attention
+        </span>
+      ))}
+    </div>
+  )
+}

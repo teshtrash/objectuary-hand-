@@ -1,0 +1,56 @@
+.opening-screen {
+  background: var(--color-bg);
+  padding: 2rem;
+  min-height: 100vh;
+  height: auto;
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+
+.opening-content {
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5rem;
+  padding: 3rem 2rem 4rem;
+}
+
+.critique-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.critique-item {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  line-height: 1.8;
+  text-align: center;
+  color: #000000;
+  font-weight: 500;
+}
+
+.critique-item strong {
+  font-weight: 800;
+  color: #000000;
+  font-size: 1.1rem;
+}
+
+.enter-btn {
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: 600;
+  padding: 1rem 4rem;
+  background: transparent;
+  border: 3px solid #000000;
+  color: #000000;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: 0.05em;
+}
+
+.enter-btn:hover {
+  background: #000000;
+  color: var(--color-bg);
+}

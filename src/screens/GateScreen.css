@@ -1,0 +1,59 @@
+.gate-screen {
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  height: 100vh;
+  background: transparent;
+}
+
+/* Gate sits on TOP of the real cemetery */
+.gate-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 100;
+  background: transparent;
+}
+
+/* Gate halves */
+.gate-half {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: contain;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-color: var(--color-bg);
+  z-index: 2;
+}
+
+.gate-half--left {
+  clip-path: inset(0 50% 0 0);
+}
+
+.gate-half--right {
+  clip-path: inset(0 0 0 50%);
+}
+
+.gate-hint {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-gray);
+  letter-spacing: 0.15em;
+  text-transform: lowercase;
+  z-index: 3;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
