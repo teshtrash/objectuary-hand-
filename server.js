@@ -36,9 +36,10 @@ app.get('/api/attention', (_req, res) => {
 })
 
 // Increment a single tomb's attention
-app.post('/api/attention/:id', (req, res) => {
+app.post('/api/attention', (req, res) => {
   const data = readData()
-  const id = req.params.id
+  const id = req.body.id
+  if (!id) return res.status(400).json({ error: 'Missing tomb id' })
   if (!(id in data)) return res.status(404).json({ error: 'Unknown tomb' })
   data[id] = (data[id] || 0) + 1
   writeData(data)

@@ -14,7 +14,11 @@ export function useAttention() {
 
   const increment = useCallback(async (tombId) => {
     try {
-      const res = await fetch(`${API_BASE}/${tombId}`, { method: 'POST' })
+      const res = await fetch(API_BASE, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: tombId })
+      })
       const data = await res.json()
       setViews(data)
       return data
