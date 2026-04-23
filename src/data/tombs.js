@@ -77,4 +77,5 @@ function generateTombs() {
   })
 }
 
+export { generateTombs }
 export const TOMBS = generateTombs()

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { gsap } from 'gsap'
-import { TOMBS } from '../data/tombs'
+import { generateTombs } from '../data/tombs'
 import { GRAVE_BG, OBJECTUARY_ICON, SCANNER_ON, SCANNER } from '../assets'
 import { useAttention } from '../hooks/useAttention'
 import { useAudio } from '../hooks/useAudio'
@@ -50,8 +50,9 @@ export default function ObjectuaryScreen({ onSelect, disableInteraction = false,
   const [showPaper, setShowPaper] = useState(false)
   const { views: tombViews, increment: incrementAttention } = useAttention()
   const [attentionPopups, setAttentionPopups] = useState([])
+  const [tombs] = useState(() => generateTombs())
   const [tombOffsets, setTombOffsets] = useState(() =>
-    Object.fromEntries(TOMBS.map(t => [t.id, { dx: 0, dy: 0 }]))
+    Object.fromEntries(tombs.map(t => [t.id, { dx: 0, dy: 0 }]))
   )
   const { play, loop, stop } = useAudio()
   const readyRef = useRef(false)
@@ -152,15 +153,15 @@ export default function ObjectuaryScreen({ onSelect, disableInteraction = false,
   useEffect(() => {
     const vw = window.innerWidth
     const vh = window.innerHeight
-    const pos = TOMBS.map(tomb => ({
+    const pos = tombs.map(tomb => ({
       x: tomb.x * vw / 100,
       y: tomb.y * vh / 100,
     }))
-    const widths = TOMBS.map(tomb => getTombWidth(tomb, tombViews))
+    const widths = tombs.map(tomb => getTombWidth(tomb, tombViews))
     const HR = 0.85 // approximate height-to-width ratio
     for (let iter = 0; iter < 35; iter++) {
-      for (let i = 0; i < TOMBS.length; i++) {
-        for (let j = i + 1; j < TOMBS.length; j++) {
+      for (let i = 0; i < tombs.length; i++) {
+        for (let j = i + 1; j < tombs.length; j++) {
           const dx = pos[j].x - pos[i].x
           const dy = pos[j].y - pos[i].y
           const minX = (widths[i] + widths[j]) / 2 + 10
@@ -168,8 +169,8 @@ export default function ObjectuaryScreen({ onSelect, disableInteraction = false,
           const ox = minX - Math.abs(dx)
           const oy = minY - Math.abs(dy)
           if (ox > 0 && oy > 0) {
-            const ci = tombViews[TOMBS[i].id] || 0
-            const cj = tombViews[TOMBS[j].id] || 0
+            const ci = tombViews[tombs[i].id] || 0
+            const cj = tombViews[tombs[j].id] || 0
             const total = ci + cj
             const ri = total > 0 ? cj / total : 0.5
             const rj = 1 - ri
@@ -187,12 +188,12 @@ export default function ObjectuaryScreen({ onSelect, disableInteraction = false,
       }
     }
     setTombOffsets(
-      Object.fromEntries(TOMBS.map((tomb, i) => [
+      Object.fromEntries(tombs.map((tomb, i) => [
         tomb.id,
         { dx: pos[i].x / vw * 100 - tomb.x, dy: pos[i].y / vh * 100 - tomb.y },
       ]))
     )
-  }, [tombViews])
+  }, [tombViews, tombs])
 
   // Scroll wheel down to zoom out
   useEffect(() => {
@@ -501,7 +502,7 @@ export default function ObjectuaryScreen({ onSelect, disableInteraction = false,
       onClick={!zoomed ? handleZoomIn : undefined}
     >
       <div className="cemetery-map" ref={mapRef}>
-        {TOMBS.map((tomb, i) => {
+        {tombs.map((tomb, i) => {
           const w = getTombWidth(tomb, tombViews)
           const clicks = tombViews[tomb.id] || 0
           const off = tombOffsets[tomb.id] || { dx: 0, dy: 0 }
