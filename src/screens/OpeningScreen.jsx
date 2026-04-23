@@ -57,7 +57,19 @@ export default function OpeningScreen({ onEnter }) {
           </p>
         </div>
 
-        <button className="enter-btn" onClick={onEnter}>
+        <button
+          className="enter-btn"
+          onClick={() => {
+            const el = document.documentElement
+            const requestFS =
+              el.requestFullscreen ||
+              el.webkitRequestFullscreen ||
+              el.mozRequestFullScreen ||
+              el.msRequestFullscreen
+            if (requestFS) requestFS.call(el).catch(() => {})
+            onEnter()
+          }}
+        >
           Enter
         </button>
       </div>

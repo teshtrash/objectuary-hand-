@@ -36,38 +36,45 @@ const PLACEHOLDER_CONTENT = {
 const SCAN_RESULTS = ['burial', 'cremated', 'organ-donation', 'preserved']
 
 function generateTombs() {
-  const rand = seededRandom(42)
-  const tombs = []
-  const palanquinIdx = Math.floor(rand() * TOMB_COUNT)
+  const rand = seededRandom(Date.now())
 
+  // Step 1: generate all 20 grid slot positions + rotations
+  const slots = []
   for (let i = 0; i < TOMB_COUNT; i++) {
     const col = i % 5
     const row = Math.floor(i / 5)
-    // Pull the grid closer together. 
-    // col / 4 goes from 0 to 1. We span from 25% to 75% of width.
     const baseX = (col / 4) * 50 + 25
-    // row / 3 goes from 0 to 1. We span from 25% to 75% of height.
     const baseY = (row / 3) * 55 + 20
-    
-    // Slight jitter so it doesn't look perfectly aligned, but tighter than before
-    const jitterX = (rand() - 0.5) * 8
-    const jitterY = (rand() - 0.5) * 8
-    const isPalanquin = i === palanquinIdx
-
-    tombs.push({
-      id: i + 1,
-      x: Math.max(5, Math.min(95, baseX + jitterX)),
-      y: Math.max(5, Math.min(95, baseY + jitterY)),
-      isPalanquin,
+    slots.push({
+      x: Math.max(5, Math.min(95, baseX + (rand() - 0.5) * 8)),
+      y: Math.max(5, Math.min(95, baseY + (rand() - 0.5) * 8)),
       rotation: (rand() - 0.5) * 6,
+    })
+  }
+
+  // Step 2: Fisher-Yates shuffle — so each tomb image lands in a random slot
+  for (let i = slots.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1))
+    ;[slots[i], slots[j]] = [slots[j], slots[i]]
+  }
+
+  // Step 3: assign tomb identity i to shuffled slot i
+  const palanquinIdx = Math.floor(rand() * TOMB_COUNT)
+  return Array.from({ length: TOMB_COUNT }, (_, i) => {
+    const isPalanquin = i === palanquinIdx
+    return {
+      id: i + 1,
+      x: slots[i].x,
+      y: slots[i].y,
+      rotation: slots[i].rotation,
+      isPalanquin,
       image: tombImage(i),
       paperImage: tombPaperImage(i),
       scannedImage: tombScannedImage(i),
       content: isPalanquin ? PALANQUIN_CONTENT : PLACEHOLDER_CONTENT,
       scanResult: isPalanquin ? 'cremated' : SCAN_RESULTS[i % SCAN_RESULTS.length],
-    })
-  }
-  return tombs
+    }
+  })
 }
 
 export const TOMBS = generateTombs()

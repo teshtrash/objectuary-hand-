@@ -1,5 +1,7 @@
 .objectuary-screen {
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  background-image: url('/assets/objectuary-texture.png');
+  background-repeat: repeat;
   position: relative;
   height: 100vh;
   overflow: hidden;
@@ -32,7 +34,7 @@
   opacity: 0;
   pointer-events: none;
   cursor: default;
-  transition: width 0.6s ease-out;
+  transition: width 0.6s ease-out, left 0.55s ease-out, top 0.55s ease-out;
 }
 
 .tomb img {
@@ -45,7 +47,7 @@
 .cemetery-map--zoomed .tomb {
   pointer-events: auto;
   cursor: pointer;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, left 0.55s ease-out, top 0.55s ease-out;
 }
 
 .cemetery-map--zoomed .tomb:hover {
@@ -383,26 +385,33 @@
 
 .scanner-device {
   position: absolute;
-  right: -25px;
+  right: -80px;
   top: 0;
   left: auto;
   transform: rotate(-35deg);
-  width: 75px;
-  z-index: 62;
+  width: 140px;
+  z-index: 65;
   cursor: grab;
   touch-action: none;
   margin-top: -15px;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.scanner-device:hover {
+  transform: rotate(-35deg) scale(1.05);
+  filter: brightness(1.1);
 }
 
 .scanner-device:active {
   cursor: grabbing;
+  transform: rotate(-35deg) scale(0.95);
 }
 
 .scanner-device img {
   width: 100%;
   height: auto;
   pointer-events: none;
-  filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.25));
+  filter: drop-shadow(0px 8px 16px rgba(0,0,0,0.4));
 }
 
 .scanner-drag-hint {
@@ -471,6 +480,10 @@
 }
 
 .scan-return-btn {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
   font-family: var(--font-mono);
   font-size: 0.7rem;
   color: var(--color-ink);
@@ -480,10 +493,8 @@
   cursor: pointer;
   letter-spacing: 0.1em;
   transition: all 0.2s;
-  margin-top: auto;
-  margin-bottom: 2.5rem;
-  z-index: 2;
-  position: relative;
+  z-index: 200;
+  white-space: nowrap;
 }
 
 .scan-return-btn:hover {
@@ -499,10 +510,12 @@
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--color-accent);
+  background-color: white;
+  border: 1px solid var(--color-ink, black);
+  padding: 0.3rem 0.6rem;
   pointer-events: none;
   z-index: 200;
   white-space: nowrap;
-  text-shadow: 0 0 6px rgba(0, 255, 68, 0.5);
   animation: attention-float 1.1s ease-out forwards;
 }
 
