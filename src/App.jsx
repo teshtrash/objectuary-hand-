@@ -66,6 +66,7 @@ export default function App() {
           key={`objectuary-${objectuaryKey}`}
           disableInteraction={currentScreen === 'gate'}
           revealing={revealing}
+          onHome={resetToOpening}
         />
       )}
 

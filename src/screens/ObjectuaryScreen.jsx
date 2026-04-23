@@ -43,7 +43,7 @@ function getTombWidth(tomb, views) {
   return base * (1 + Math.min(clicks * 0.08, 1.6))
 }
 
-export default function ObjectuaryScreen({ onSelect, disableInteraction = false, revealing = false }) {
+export default function ObjectuaryScreen({ onSelect, onHome, disableInteraction = false, revealing = false }) {
   const mapRef = useRef(null)
   const [zoomed, setZoomed] = useState(false)
   const [selectedTomb, setSelectedTomb] = useState(null)
@@ -626,6 +626,13 @@ export default function ObjectuaryScreen({ onSelect, disableInteraction = false,
           </button>
         )}
       </>)}
+
+      {/* Home Button */}
+      {!selectedTomb && !showPaper && (
+        <button className="home-btn" onClick={onHome} title="Return to Home">
+          Home
+        </button>
+      )}
 
       {zoomed && !selectedTomb && (
         <button className="zoom-out-btn" onClick={(e) => { e.stopPropagation(); zoomingRef.current = true; gsap.to(mapRef.current, { scale: 1, x: 0, y: 0, duration: 0.6, ease: 'power2.inOut', onComplete: () => { mapRef.current.classList.remove('cemetery-map--zoomed'); setZoomed(false); zoomingRef.current = false } }) }}>
