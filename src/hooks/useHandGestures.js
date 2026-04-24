@@ -218,45 +218,58 @@ export function useHandGestures({ enabled = true, onCursorMove } = {}) {
     let cancelled = false
 
     async function init() {
+      console.log('[HandGestures] Initializing MediaPipe...')
       try {
         await loadMediaPipe()
+        console.log('[HandGestures] Scripts loaded.')
       } catch (err) {
-        console.warn('[HandGestures] Failed to load MediaPipe CDN:', err)
+        console.error('[HandGestures] Failed to load MediaPipe CDN:', err)
         return
       }
       if (cancelled) return
 
-      /* global Hands, Camera */
-      const hands = new window.Hands({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
-      })
-      hands.setOptions({
-        maxNumHands: 2,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.7,
-        minTrackingConfidence: 0.6,
-      })
-      hands.onResults(onResults)
-      handsRef.current = hands
+      try {
+        /* global Hands, Camera */
+        const hands = new window.Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+        })
+        hands.setOptions({
+          maxNumHands: 2,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.7,
+          minTrackingConfidence: 0.6,
+        })
+        hands.onResults(onResults)
+        handsRef.current = hands
+        console.log('[HandGestures] Hands model initialized.')
 
-      // Hidden video element for webcam
-      const video = document.createElement('video')
-      video.setAttribute('playsinline', '')
-      video.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-9999;'
-      document.body.appendChild(video)
-      videoRef.current = video
+        // Hidden video element for webcam
+        const video = document.createElement('video')
+        video.setAttribute('playsinline', '')
+        video.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-9999;'
+        document.body.appendChild(video)
+        videoRef.current = video
 
-      const camera = new window.Camera(video, {
-        onFrame: async () => {
-          if (handsRef.current) {
-            await handsRef.current.send({ image: video })
-          }
-        },
-        width: 640,
-        height: 480,
-      })
-      camera.start()
-      cameraRef.current = camera
+        const camera = new window.Camera(video, {
+          onFrame: async () => {
+            if (handsRef.current) {
+              await handsRef.current.send({ image: video })
+            }
+          },
+          width: 640,
+          height: 480,
+        })
+        
+        console.log('[HandGestures] Starting camera...')
+        await camera.start()
+        cameraRef.current = camera
+        console.log('[HandGestures] Camera started successfully.')
+      } catch (err) {
+        console.error('[HandGestures] Initialization error:', err)
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          alert('Camera access is required for hand gestures. Please check your browser permissions.')
+        }
+      }
     }
 
     init()
