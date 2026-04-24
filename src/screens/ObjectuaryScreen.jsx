@@ -43,7 +43,7 @@ function getTombWidth(tomb, views) {
   return base * (1 + Math.min(clicks * 0.08, 1.6))
 }
 
-export default function ObjectuaryScreen({ onSelect, onHome, disableInteraction = false, revealing = false, handTrackingEnabled = false }) {
+export default function ObjectuaryScreen({ onSelect, onHome, disableInteraction = false, revealing = false }) {
   const mapRef = useRef(null)
   const [zoomed, setZoomed] = useState(false)
   const [selectedTomb, setSelectedTomb] = useState(null)
@@ -124,21 +124,15 @@ export default function ObjectuaryScreen({ onSelect, onHome, disableInteraction 
       setScanComplete(false)
 
       // Kill any previous hint
-      if (hintAnimRef.current) hintAnimRef.current.kill()
-
-      // Start looping hint animation after initial delay
-      const timerId = setTimeout(() => {
-        const scannerEl = scannerDeviceRef.current
-        if (!scannerEl) return
-        const tl = gsap.timeline({ repeat: -1, repeatDelay: 1.2, defaults: {} })
-          .to(scannerEl, { y: 65, duration: 0.55, ease: 'power2.inOut' })
-          .to(scannerEl, { y: 0, duration: 0.45, ease: 'back.out(2)' })
-          .to(scannerEl, { y: 30, duration: 0.38, ease: 'power2.inOut', delay: 0.1 })
-          .to(scannerEl, { y: 0, duration: 0.32, ease: 'back.out(2)' })
-        hintAnimRef.current = tl
-      }, 800)
-
-      return () => clearTimeout(timerId)
+      if (hintAnimRef.current) {
+        hintAnimRef.current.kill()
+        hintAnimRef.current = null
+      }
+      
+      // Removed the bouncing animation so the scanner is easier to grab with hand gestures
+      if (scannerDeviceRef.current) {
+        gsap.set(scannerDeviceRef.current, { y: 0 })
+      }
     } else {
       // Paper closed — kill hint
       if (hintAnimRef.current) {
@@ -494,76 +488,6 @@ export default function ObjectuaryScreen({ onSelect, onHome, disableInteraction 
       window.removeEventListener('touchend', handleUp)
     }
   }, [dragging, updateScanProgress, scanProgress])
-
-  // ── Hand-gesture scanner mode ──────────────────────────────
-  // When hand tracking is on and paper is visible, the scanner
-  // follows the cursor Y position directly — no pinch needed.
-  const handScanStarted = useRef(false)
-
-  useEffect(() => {
-    if (!handTrackingEnabled || !showPaper || scanComplete) {
-      handScanStarted.current = false
-      return
-    }
-
-    const handleHandMove = (e) => {
-      // Ignore real physical mouse — only respond to synthetic events from hand tracking
-      // (synthetic events have isTrusted = false)
-      if (e.isTrusted) return
-
-      const container = scannerContainerRef.current
-      if (!container) return
-      const rect = container.getBoundingClientRect()
-      const scannerH = 80
-      const maxTravel = rect.height - scannerH
-
-      // Check if cursor is within the scanner overlay area
-      const cursorX = e.clientX
-      const cursorY = e.clientY
-      if (cursorX < rect.left || cursorX > rect.right ||
-          cursorY < rect.top  || cursorY > rect.bottom) {
-        return
-      }
-
-      // First time entering the area — kill hint and start scanner sound
-      if (!handScanStarted.current) {
-        handScanStarted.current = true
-        if (hintAnimRef.current) {
-          hintAnimRef.current.kill()
-          hintAnimRef.current = null
-          if (scannerDeviceRef.current) gsap.set(scannerDeviceRef.current, { y: 0 })
-        }
-        loop(SCANNER_LOOP, { volume: 0.4 })
-      }
-
-      // Map cursor Y within the container to scanner position
-      const relativeY = cursorY - rect.top
-      const newTop = Math.max(0, Math.min(maxTravel, relativeY))
-      const progress = Math.round((newTop / maxTravel) * 100)
-
-      setScanProgress(progress)
-      const scannerEl = container.querySelector('.scanner-device')
-      if (scannerEl) scannerEl.style.top = `${newTop}px`
-
-      // Auto-complete when progress hits 95%+
-      if (progress >= 95) {
-        stop(SCANNER_LOOP)
-        setScanProgress(100)
-        setScanComplete(true)
-        play(SCANNING_DONE)
-        handScanStarted.current = false
-      }
-    }
-
-    window.addEventListener('mousemove', handleHandMove)
-    return () => {
-      window.removeEventListener('mousemove', handleHandMove)
-      if (handScanStarted.current) {
-        stop(SCANNER_LOOP)
-        handScanStarted.current = false
-      }
-    }
-  }, [handTrackingEnabled, showPaper, scanComplete, loop, stop, play])
 
   const resultData = scanResult ? RESULT_DATA[scanResult] : null
 

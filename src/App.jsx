@@ -133,7 +133,6 @@ export default function App() {
           disableInteraction={currentScreen === 'gate'}
           revealing={revealing}
           onHome={resetToOpening}
-          handTrackingEnabled={handTrackingEnabled}
         />
       )}
 
