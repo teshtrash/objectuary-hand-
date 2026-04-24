@@ -41,36 +41,49 @@ export default function App() {
     }, INACTIVITY_TIMEOUT_MS)
   }, [])
 
-  const handleGlobalClick = useCallback(() => {
-    play(GENERIC_CLICK)
+  const handleFullscreenRequest = useCallback(() => {
     const el = document.documentElement
-    if (!document.fullscreenElement && 
-        !document.webkitFullscreenElement && 
-        !document.mozFullScreenElement && 
-        !document.msFullscreenElement) {
+    const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement)
+    
+    if (!isFS) {
       const requestFS =
         el.requestFullscreen ||
         el.webkitRequestFullscreen ||
         el.mozRequestFullScreen ||
         el.msRequestFullscreen
-      if (requestFS) requestFS.call(el).catch(() => {})
+      if (requestFS) {
+        requestFS.call(el).catch((err) => {
+          console.warn('[Fullscreen] Request failed:', err)
+        })
+      }
     }
+  }, [])
+
+  const handleInteraction = useCallback((e) => {
+    // Only play sound once per physical interaction (using the 'click' event usually)
+    if (e.type === 'click' || (e.type === 'touchstart' && !soundtrackStarted.current)) {
+      play(GENERIC_CLICK)
+    }
+    
+    handleFullscreenRequest()
 
     // Start soundtrack on first interaction
     if (!soundtrackStarted.current) {
       loop(AMBIENT_SOUNDTRACK, { volume: 0.6 })
       soundtrackStarted.current = true
     }
-  }, [loop])
+    
+    restartTimer()
+  }, [handleFullscreenRequest, loop, play, restartTimer])
 
   useEffect(() => {
     const inactivityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll']
     inactivityEvents.forEach((e) => window.addEventListener(e, restartTimer, { passive: true }))
     
-    // Fullscreen trigger on any real user interaction
+    // Global interaction handler for fullscreen and sound initialization
     // We use capture: true to ensure this runs even if child elements stop propagation
-    const interactionEvents = ['click', 'mousedown', 'touchstart']
-    interactionEvents.forEach((e) => window.addEventListener(e, handleGlobalClick, { capture: true }))
+    const interactionEvents = ['mousedown', 'touchstart', 'click']
+    interactionEvents.forEach((e) => window.addEventListener(e, handleInteraction, { capture: true }))
 
     // Toggle hand tracking with 'H' key
     const handleKeydown = (e) => {
@@ -83,11 +96,11 @@ export default function App() {
     restartTimer() 
     return () => {
       inactivityEvents.forEach((e) => window.removeEventListener(e, restartTimer))
-      interactionEvents.forEach((e) => window.removeEventListener(e, handleGlobalClick, { capture: true }))
+      interactionEvents.forEach((e) => window.removeEventListener(e, handleInteraction, { capture: true }))
       window.removeEventListener('keydown', handleKeydown)
       if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
     }
-  }, [restartTimer, handleGlobalClick])
+  }, [restartTimer, handleInteraction])
 
   // Gate→Cemetery is special: cemetery renders underneath the gate,
   // gate slides apart revealing it, then gate unmounts. No AnimatePresence swap.
