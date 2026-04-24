@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion'
 import OpeningScreen from './screens/OpeningScreen'
 import GateScreen from './screens/GateScreen'
 import ObjectuaryScreen from './screens/ObjectuaryScreen'
+import HandCursor from './components/HandCursor'
 import { useAudio } from './hooks/useAudio'
 import { AMBIENT_SOUNDTRACK, GENERIC_CLICK } from './audio'
 import './styles/global.css'
@@ -13,6 +14,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState('opening')
   const [revealing, setRevealing] = useState(false)
   const [objectuaryKey, setObjectuaryKey] = useState(0)
+  const [handTrackingEnabled, setHandTrackingEnabled] = useState(true)
   const inactivityTimer = useRef(null)
   const { loop, play } = useAudio()
   const soundtrackStarted = useRef(false)
@@ -62,16 +64,27 @@ export default function App() {
   }, [loop])
 
   useEffect(() => {
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll']
-    events.forEach((e) => window.addEventListener(e, restartTimer, { passive: true }))
+    const inactivityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll']
+    inactivityEvents.forEach((e) => window.addEventListener(e, restartTimer, { passive: true }))
     
-    // Fullscreen trigger on any click
-    window.addEventListener('click', handleGlobalClick)
+    // Fullscreen trigger on any real user interaction
+    // We use capture: true to ensure this runs even if child elements stop propagation
+    const interactionEvents = ['click', 'mousedown', 'touchstart']
+    interactionEvents.forEach((e) => window.addEventListener(e, handleGlobalClick, { capture: true }))
+
+    // Toggle hand tracking with 'H' key
+    const handleKeydown = (e) => {
+      if (e.key === 'h' || e.key === 'H') {
+        setHandTrackingEnabled(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeydown)
     
     restartTimer() 
     return () => {
-      events.forEach((e) => window.removeEventListener(e, restartTimer))
-      window.removeEventListener('click', handleGlobalClick)
+      inactivityEvents.forEach((e) => window.removeEventListener(e, restartTimer))
+      interactionEvents.forEach((e) => window.removeEventListener(e, handleGlobalClick, { capture: true }))
+      window.removeEventListener('keydown', handleKeydown)
       if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
     }
   }, [restartTimer, handleGlobalClick])
@@ -91,6 +104,8 @@ export default function App() {
 
   return (
     <div className="app">
+      {/* Hand gesture tracking overlay */}
+      <HandCursor enabled={handTrackingEnabled} />
       {/* Cemetery lives permanently behind the gate — no swap, no flicker */}
       {showCemeteryBehindGate && (
         <ObjectuaryScreen
