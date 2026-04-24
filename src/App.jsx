@@ -52,20 +52,27 @@ export default function App() {
         el.mozRequestFullScreen ||
         el.msRequestFullscreen
       if (requestFS) {
+        // We must catch the promise rejection because browsers will reject if not a trusted user gesture
         requestFS.call(el).catch((err) => {
-          console.warn('[Fullscreen] Request failed:', err)
+          console.warn('[Fullscreen] Request failed (likely needs physical click):', err)
         })
       }
     }
   }, [])
 
   const handleInteraction = useCallback((e) => {
-    // Only play sound once per physical interaction (using the 'click' event usually)
-    if (e.type === 'click' || (e.type === 'touchstart' && !soundtrackStarted.current)) {
+    // ONLY respond to real physical interactions for security-restricted APIs like fullscreen and audio context
+    if (!e.isTrusted) return
+
+    // Only play sound once per physical interaction
+    if (e.type === 'click' || (e.type === 'touchend' && !soundtrackStarted.current)) {
       play(GENERIC_CLICK)
     }
     
-    handleFullscreenRequest()
+    // Request fullscreen on explicit click or touchend (mousedown often rejected by browsers)
+    if (e.type === 'click' || e.type === 'touchend') {
+       handleFullscreenRequest()
+    }
 
     // Start soundtrack on first interaction
     if (!soundtrackStarted.current) {
@@ -82,7 +89,7 @@ export default function App() {
     
     // Global interaction handler for fullscreen and sound initialization
     // We use capture: true to ensure this runs even if child elements stop propagation
-    const interactionEvents = ['mousedown', 'touchstart', 'click']
+    const interactionEvents = ['click', 'touchend']
     interactionEvents.forEach((e) => window.addEventListener(e, handleInteraction, { capture: true }))
 
     // Toggle hand tracking with 'H' key
