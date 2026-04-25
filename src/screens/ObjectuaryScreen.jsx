@@ -555,20 +555,20 @@ export default function ObjectuaryScreen({ onSelect, onHome, disableInteraction 
 
       {/* Paper overlay with scanner */}
       {showPaper && selectedTomb && (<>
-        <div className="paper-backdrop" style={{ backgroundImage: `url('${GRAVE_BG}')` }}>
-          {!scanComplete && (
-            <button className="hover-back-btn" onClick={handleClosePaper}>
-              &#8592;
-            </button>
-          )}
+        <div className="paper-backdrop" onClick={handleClosePaper} style={{ backgroundImage: `url('${GRAVE_BG}')` }}>
           <img
             className="paper-backdrop-tomb"
             src={selectedTomb.image}
             alt=""
           />
-          <div className="paper-container" ref={paperRef}>
+          <div className="paper-container" ref={paperRef} onClick={(e) => e.stopPropagation()}>
             {/* Custom hand-designed objectuary paper per tomb */}
             <img src={selectedTomb.paperImage} alt="" className="paper-bg" style={{ opacity: 1 - scanProgress / 100 }} />
+
+            {/* Close button */}
+            {!scanComplete && (
+              <button className="paper-close" onClick={handleClosePaper}>{'\u00D7'}</button>
+            )}
 
             {/* Scanner overlay — vertical */}
             <div className="scanner-overlay" ref={scannerContainerRef}>

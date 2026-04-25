@@ -21,6 +21,9 @@ const FIST_CURL_THRESHOLD = 0.08   // finger-tip-to-palm distance to count as "c
 const ZOOM_SENSITIVITY    = 800    // multiplier for two-hand distance → wheel delta
 const LERP_FACTOR         = 0.1    // smoothing (0 = frozen, 1 = raw/jittery) — 0.1 = silk-smooth damping
 const COOLDOWN_MS         = 350    // min ms between successive pinch-clicks
+const SWIPE_THRESHOLD     = 0.18   // normalised X distance for a swipe (0–1)
+const SWIPE_FRAMES        = 8      // number of frames to track for swipe detection
+const SWIPE_COOLDOWN_MS   = 800    // min ms between successive swipe-backs
 
 // ─── Helpers ────────────────────────────────────────────────────
 function lerp(a, b, t) { return a + (b - a) * t }
@@ -127,6 +130,10 @@ export function useHandGestures({ enabled = true, onCursorMove } = {}) {
   const cameraRef     = useRef(null)
   const videoRef      = useRef(null)
 
+  // Swipe-right tracking
+  const swipeHistory  = useRef([])    // recent raw wrist X positions (normalised 0–1)
+  const lastSwipeTime = useRef(0)
+
   // Called every frame by MediaPipe
   const onResults = useCallback((results) => {
     const hands = results.multiHandLandmarks || []
@@ -208,6 +215,39 @@ export function useHandGestures({ enabled = true, onCursorMove } = {}) {
       fistOrigin.current = null
     }
     prevFist.current = fist
+
+    // ── Swipe-right detection (go back) ───────────────────────
+    // Track the raw (unsmoothed) wrist X over recent frames
+    const wristX = lm[0].x  // 0–1, mirrored
+    swipeHistory.current.push(wristX)
+    if (swipeHistory.current.length > SWIPE_FRAMES) {
+      swipeHistory.current.shift()
+    }
+    if (swipeHistory.current.length === SWIPE_FRAMES) {
+      // In MediaPipe's mirrored coords, a real-world swipe RIGHT
+      // means X is DECREASING (because the image is mirrored)
+      const oldest = swipeHistory.current[0]
+      const newest = swipeHistory.current[SWIPE_FRAMES - 1]
+      const delta = oldest - newest  // positive = rightward swipe in real world
+
+      if (delta > SWIPE_THRESHOLD) {
+        const now = Date.now()
+        if (now - lastSwipeTime.current > SWIPE_COOLDOWN_MS) {
+          lastSwipeTime.current = now
+          swipeHistory.current = []  // reset to prevent repeated triggers
+
+          // Find and click the most relevant back button
+          const backBtn =
+            document.querySelector('.scan-return-btn') ||
+            document.querySelector('.paper-close') ||
+            document.querySelector('.hover-back-btn') ||
+            document.querySelector('.zoom-out-btn')
+          if (backBtn) {
+            backBtn.click()
+          }
+        }
+      }
+    }
 
   }, [onCursorMove])
 
