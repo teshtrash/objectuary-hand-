@@ -130,9 +130,11 @@ export function useHandGestures({ enabled = true, onCursorMove } = {}) {
   const cameraRef     = useRef(null)
   const videoRef      = useRef(null)
 
-  // Swipe-right tracking
-  const swipeHistory  = useRef([])    // recent raw wrist X positions (normalised 0–1)
+  // Swipe tracking
+  const swipeHistoryX = useRef([])    // recent raw wrist X positions (normalised 0–1)
+  const swipeHistoryY = useRef([])    // recent raw wrist Y positions (normalised 0–1)
   const lastSwipeTime = useRef(0)
+  const scanAnimating = useRef(false) // prevent overlapping scan animations
 
   // Called every frame by MediaPipe
   const onResults = useCallback((results) => {
@@ -216,34 +218,78 @@ export function useHandGestures({ enabled = true, onCursorMove } = {}) {
     }
     prevFist.current = fist
 
-    // ── Swipe-right detection (go back) ───────────────────────
-    // Track the raw (unsmoothed) wrist X over recent frames
+    // ── Swipe detection ────────────────────────────────────────
+    // Track raw (unsmoothed) wrist position over recent frames
     const wristX = lm[0].x  // 0–1, mirrored
-    swipeHistory.current.push(wristX)
-    if (swipeHistory.current.length > SWIPE_FRAMES) {
-      swipeHistory.current.shift()
+    const wristY = lm[0].y  // 0–1
+    swipeHistoryX.current.push(wristX)
+    swipeHistoryY.current.push(wristY)
+    if (swipeHistoryX.current.length > SWIPE_FRAMES) {
+      swipeHistoryX.current.shift()
+      swipeHistoryY.current.shift()
     }
-    if (swipeHistory.current.length === SWIPE_FRAMES) {
-      // In MediaPipe's mirrored coords, a real-world swipe RIGHT
-      // means X is DECREASING (because the image is mirrored)
-      const oldest = swipeHistory.current[0]
-      const newest = swipeHistory.current[SWIPE_FRAMES - 1]
-      const delta = oldest - newest  // positive = rightward swipe in real world
 
-      if (delta > SWIPE_THRESHOLD) {
-        const now = Date.now()
-        if (now - lastSwipeTime.current > SWIPE_COOLDOWN_MS) {
+    if (swipeHistoryX.current.length === SWIPE_FRAMES) {
+      const oldestX = swipeHistoryX.current[0]
+      const newestX = swipeHistoryX.current[SWIPE_FRAMES - 1]
+      const deltaX = oldestX - newestX  // positive = rightward swipe in real world
+
+      const oldestY = swipeHistoryY.current[0]
+      const newestY = swipeHistoryY.current[SWIPE_FRAMES - 1]
+      const deltaY = newestY - oldestY  // positive = downward swipe in real world
+
+      const now = Date.now()
+      const cooldownOk = now - lastSwipeTime.current > SWIPE_COOLDOWN_MS
+
+      // ── Swipe RIGHT → go back ────────────────────────────────
+      if (deltaX > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY) && cooldownOk) {
+        lastSwipeTime.current = now
+        swipeHistoryX.current = []
+        swipeHistoryY.current = []
+
+        const backBtn =
+          document.querySelector('.scan-return-btn') ||
+          document.querySelector('.paper-close') ||
+          document.querySelector('.hover-back-btn') ||
+          document.querySelector('.zoom-out-btn')
+        if (backBtn) backBtn.click()
+      }
+
+      // ── Swipe DOWN → scan ────────────────────────────────────
+      if (deltaY > SWIPE_THRESHOLD && Math.abs(deltaY) > Math.abs(deltaX) && cooldownOk && !scanAnimating.current) {
+        const scannerEl = document.querySelector('.scanner-device')
+        const containerEl = document.querySelector('.scanner-overlay')
+        if (scannerEl && containerEl) {
           lastSwipeTime.current = now
-          swipeHistory.current = []  // reset to prevent repeated triggers
+          swipeHistoryX.current = []
+          swipeHistoryY.current = []
+          scanAnimating.current = true
 
-          // Find and click the most relevant back button
-          const backBtn =
-            document.querySelector('.scan-return-btn') ||
-            document.querySelector('.paper-close') ||
-            document.querySelector('.hover-back-btn') ||
-            document.querySelector('.zoom-out-btn')
-          if (backBtn) {
-            backBtn.click()
+          // Simulate the full scanner drag: mousedown → move down → mouseup
+          const scannerRect = scannerEl.getBoundingClientRect()
+          const containerRect = containerEl.getBoundingClientRect()
+          const startX = scannerRect.left + scannerRect.width / 2
+          const startY = scannerRect.top + scannerRect.height / 2
+          const endY = containerRect.bottom - 10
+          const steps = 25
+          const stepDuration = 40  // ms per step — total ~1s
+
+          // Start the drag
+          fireMouseEvent('mousedown', startX, startY)
+
+          // Animate mousemove events downward
+          for (let i = 1; i <= steps; i++) {
+            setTimeout(() => {
+              const progress = i / steps
+              const currentY = startY + (endY - startY) * progress
+              fireMouseEvent('mousemove', startX, currentY)
+
+              // Final step — release
+              if (i === steps) {
+                fireMouseEvent('mouseup', startX, currentY)
+                scanAnimating.current = false
+              }
+            }, i * stepDuration)
           }
         }
       }
